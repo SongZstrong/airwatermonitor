@@ -127,3 +127,38 @@ Improve map usability after the data-match bug fix by making interaction clearer
 
 ### V10
 - Final polish pass on visual hierarchy and messaging consistency with existing dashboard style.
+
+## 9) Advanced interaction enhancement (third 10-version iteration)
+
+### Goal
+Add richer map UX for analysts: cursor-follow tooltip, selection emphasis, and missing-data visibility panel.
+
+### V1
+- Reframed UX into three layers: discover (hover), inspect (click), diagnose (missing list).
+
+### V2
+- Extended hover state to include cursor coordinates for true floating tooltip behavior.
+
+### V3
+- Migrated from static hover card to pointer-follow tooltip (`position: fixed`).
+
+### V4
+- Improved hover update cadence using `onMouseMove` per geography path.
+
+### V5
+- Added selected-country visual emphasis (darker border + thicker stroke).
+
+### V6
+- Added map-level approximate coverage percentage to improve data trust context.
+
+### V7
+- Added toggle button to reveal/hide missing-data list without overwhelming default view.
+
+### V8
+- Added missing-country panel with capped list output for readability.
+
+### V9
+- Validated coexistence of hover tooltip + click selection + detail panel state.
+
+### V10
+- Polished text hierarchy and control labels to align with dashboard tone and scannability.

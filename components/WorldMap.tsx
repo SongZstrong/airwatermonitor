@@ -31,6 +31,8 @@ type HoverPreview = {
   iso3: string | null;
   value?: number;
   hasData: boolean;
+  x: number;
+  y: number;
 };
 
 const GEO_URL = "/world-110m.json";
@@ -113,6 +115,7 @@ export function WorldMap({ data, legendLabel, formatOptions, detailMetrics }: Wo
   const formatValue = (value: number) => `${value.toFixed(decimals)}${suffix}`;
   const [selectedIso3, setSelectedIso3] = useState<string | null>(null);
   const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
+  const [showMissingList, setShowMissingList] = useState(false);
 
   const prepareData = (dataset: MapDatum[]) =>
     dataset.filter((item) => item.iso3 && Number.isFinite(item.value));
@@ -179,13 +182,30 @@ export function WorldMap({ data, legendLabel, formatOptions, detailMetrics }: Wo
     return { code: selectedIso3, name, region, metrics };
   }, [detailLookups, prepared.ref, selectedIso3]);
 
+  const coverageRate = Math.round((prepared.dataCount / 177) * 100);
+  const missingCountries = useMemo(
+    () =>
+      data
+        .filter((item) => !item.iso3 || !Number.isFinite(item.value))
+        .map((item) => item.name)
+        .slice(0, 20),
+    [data],
+  );
+
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="relative rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-        <span>
-          Live data coverage: {prepared.dataCount} countries
-        </span>
-        <span>Hover to preview, click to pin details.</span>
+        <span>Live data coverage: {prepared.dataCount} countries (~{coverageRate}%)</span>
+        <div className="flex items-center gap-3">
+          <span>Hover to preview, click to pin details.</span>
+          <button
+            type="button"
+            onClick={() => setShowMissingList((prev) => !prev)}
+            className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            {showMissingList ? "Hide" : "Show"} missing list
+          </button>
+        </div>
       </div>
       <ComposableMap projectionConfig={{ scale: 150 }}>
         <Geographies geography={GEO_URL}>
@@ -209,24 +229,28 @@ export function WorldMap({ data, legendLabel, formatOptions, detailMetrics }: Wo
                   ? interpolateColor(value, prepared.min, prepared.max)
                   : "#e2e8f0";
               const selectedKey = datum?.iso3 ?? iso3 ?? null;
+              const isSelected = Boolean(selectedIso3 && selectedKey === selectedIso3);
 
               return (
                 <Geography
                   key={geo.rsmKey}
                   geography={geo}
                   fill={fill}
-                  stroke="#ffffff"
+                  stroke={isSelected ? "#0f172a" : "#ffffff"}
+                  strokeWidth={isSelected ? 1.2 : 0.6}
                   style={{
                     default: { outline: "none", cursor: "pointer" },
                     hover: { outline: "none", fill: "#2563eb", cursor: "pointer" },
                     pressed: { outline: "none" },
                   }}
-                  onMouseEnter={() => {
+                  onMouseMove={(event) => {
                     setHoverPreview({
                       name: datum?.name ?? countryName,
                       iso3: selectedKey,
                       value,
                       hasData: value !== undefined,
+                      x: event.clientX,
+                      y: event.clientY,
                     });
                   }}
                   onMouseLeave={() => setHoverPreview(null)}
@@ -252,7 +276,10 @@ export function WorldMap({ data, legendLabel, formatOptions, detailMetrics }: Wo
         </div>
       </div>
       {hoverPreview ? (
-        <div className="mt-3 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-slate-700">
+        <div
+          className="pointer-events-none fixed z-30 rounded-xl border border-sky-100 bg-white/95 px-3 py-2 text-xs text-slate-700 shadow"
+          style={{ left: hoverPreview.x + 12, top: hoverPreview.y + 12 }}
+        >
           <p className="font-semibold text-slate-900">{hoverPreview.name}</p>
           <p>
             {hoverPreview.hasData
@@ -260,6 +287,16 @@ export function WorldMap({ data, legendLabel, formatOptions, detailMetrics }: Wo
               : "No live data for this country"}
             {hoverPreview.iso3 ? ` · ISO: ${hoverPreview.iso3}` : ""}
           </p>
+        </div>
+      ) : null}
+      {showMissingList ? (
+        <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-slate-700">
+          <p className="font-semibold text-slate-900">Countries currently missing usable metric values</p>
+          {missingCountries.length ? (
+            <p className="mt-1 text-xs leading-5 text-slate-600">{missingCountries.join(", ")}</p>
+          ) : (
+            <p className="mt-1 text-xs text-slate-600">No missing countries detected in the current dataset.</p>
+          )}
         </div>
       ) : null}
       {selection ? (
