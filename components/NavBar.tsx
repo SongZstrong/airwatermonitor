@@ -9,7 +9,8 @@ const LINKS = [
   { href: "/air-quality", label: "Air Quality" },
   { href: "/water-quality", label: "Water Quality" },
   { href: "/blog", label: "Insights" },
-  { href: "/privacy", label: "Privacy & About" },
+  { href: "/about", label: "About" },
+  { href: "/privacy", label: "Privacy" },
 ];
 
 export function NavBar() {
