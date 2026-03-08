@@ -28,6 +28,55 @@ type WorldMapProps = {
 
 const GEO_URL = "/world-110m.json";
 
+const COUNTRY_NAME_ALIASES: Record<string, string> = {
+  "united states of america": "united states",
+  "russian federation": "russia",
+  "cote divoire": "ivory coast",
+  "czechia": "czech republic",
+  "korea republic of": "south korea",
+  "korea democratic peoples republic of": "north korea",
+  "bolivia plurinational state of": "bolivia",
+  "venezuela bolivarian republic of": "venezuela",
+  "tanzania united republic of": "tanzania",
+  "iran islamic republic of": "iran",
+  "syrian arab republic": "syria",
+  "lao peoples democratic republic": "laos",
+  "viet nam": "vietnam",
+};
+
+function normalizeCountryName(input: string): string {
+  const normalized = input
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return COUNTRY_NAME_ALIASES[normalized] ?? normalized;
+}
+
+function resolveIso3FromGeoProperties(
+  properties: Record<string, unknown>,
+): string | null {
+  const candidates = [
+    properties.ISO_A3,
+    properties.ADM0_A3,
+    properties.WB_A3,
+    properties.SU_A3,
+    properties.BRK_A3,
+  ];
+
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim().length === 3) {
+      return value.trim().toUpperCase();
+    }
+  }
+
+  return null;
+}
+
 function interpolateColor(value: number, min: number, max: number): string {
   if (max === min) {
     return "#4f46e5";
@@ -67,8 +116,11 @@ export function WorldMap({ data, legendLabel, formatOptions, detailMetrics }: Wo
     const min = values.length ? Math.min(...values) : 0;
     const max = values.length ? Math.max(...values) : 1;
     const ref = new Map(filtered.map((item) => [item.iso3, item]));
+    const nameRef = new Map(
+      filtered.map((item) => [normalizeCountryName(item.name), item]),
+    );
 
-    return { ref, min, max };
+    return { ref, nameRef, min, max };
   }, [data]);
 
   const detailSources = useMemo(
@@ -128,14 +180,21 @@ export function WorldMap({ data, legendLabel, formatOptions, detailMetrics }: Wo
               const props = geo.properties as {
                 ISO_A3?: string;
                 NAME?: string;
+                name?: string;
+                ADMIN?: string;
               };
-              const iso3 = props.ISO_A3 ?? "";
-              const datum = prepared.ref.get(iso3);
+              const countryName =
+                props.NAME ?? props.name ?? props.ADMIN ?? "Unknown country";
+              const iso3 = resolveIso3FromGeoProperties(props);
+              const datum =
+                (iso3 ? prepared.ref.get(iso3) : undefined) ??
+                prepared.nameRef.get(normalizeCountryName(countryName));
               const value = datum?.value;
               const fill =
                 value !== undefined
                   ? interpolateColor(value, prepared.min, prepared.max)
-                  : "#f1f5f9";
+                  : "#e2e8f0";
+              const selectedKey = datum?.iso3 ?? iso3 ?? null;
 
               return (
                 <Geography
@@ -148,12 +207,12 @@ export function WorldMap({ data, legendLabel, formatOptions, detailMetrics }: Wo
                     hover: { outline: "none", fill: "#2563eb", cursor: "pointer" },
                     pressed: { outline: "none" },
                   }}
-                  onClick={() => setSelectedIso3(iso3)}
+                  onClick={() => selectedKey && setSelectedIso3(selectedKey)}
                   tabIndex={-1}
                   aria-label={
                     datum
                       ? `${datum.name} ${legendLabel} ${formatValue(value!)}`
-                      : props.NAME
+                      : countryName
                   }
                 />
               );
