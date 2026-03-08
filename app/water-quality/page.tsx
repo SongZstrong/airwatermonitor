@@ -91,6 +91,7 @@ export default async function WaterQualityPage() {
           data={mapData}
           legendLabel="Safely managed drinking water (%)"
           formatOptions={{ decimals: 0, suffix: "%" }}
+          higherIsWorse={false}
           detailMetrics={[
             {
               label: "Average PM2.5",

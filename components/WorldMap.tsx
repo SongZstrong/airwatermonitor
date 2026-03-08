@@ -19,6 +19,7 @@ type WorldMapProps = {
   data: MapDatum[];
   legendLabel: string;
   formatOptions?: FormatOptions;
+  higherIsWorse?: boolean;
   detailMetrics?: Array<{
     label: string;
     data: MapDatum[];
@@ -86,14 +87,20 @@ function resolveIso3FromGeoProperties(
   return null;
 }
 
-function interpolateColor(value: number, min: number, max: number): string {
-  if (max === min) {
-    return "#4f46e5";
-  }
+function percentile(values: number[], ratio: number): number {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.min(
+    sorted.length - 1,
+    Math.max(0, Math.floor((sorted.length - 1) * ratio)),
+  );
+  return sorted[index];
+}
 
-  const ratio = Math.min(Math.max((value - min) / (max - min), 0), 1);
-  const start = [224, 242, 255];
-  const end = [16, 121, 145];
+function interpolateColor(severity: number): string {
+  const ratio = Math.min(Math.max(severity, 0), 1);
+  const start = [254, 242, 242];
+  const end = [153, 27, 27];
 
   const rgb = start.map((component, index) => {
     const diff = end[index] - component;
@@ -109,7 +116,13 @@ type DetailLookup = {
   formatValue: (value: number) => string;
 };
 
-export function WorldMap({ data, legendLabel, formatOptions, detailMetrics }: WorldMapProps) {
+export function WorldMap({
+  data,
+  legendLabel,
+  formatOptions,
+  higherIsWorse = true,
+  detailMetrics,
+}: WorldMapProps) {
   const decimals = formatOptions?.decimals ?? 1;
   const suffix = formatOptions?.suffix ?? "";
   const formatValue = (value: number) => `${value.toFixed(decimals)}${suffix}`;
@@ -126,12 +139,22 @@ export function WorldMap({ data, legendLabel, formatOptions, detailMetrics }: Wo
     const values = filtered.map((item) => item.value);
     const min = values.length ? Math.min(...values) : 0;
     const max = values.length ? Math.max(...values) : 1;
+    const lowerBound = values.length ? percentile(values, 0.1) : min;
+    const upperBound = values.length ? percentile(values, 0.9) : max;
     const ref = new Map(filtered.map((item) => [item.iso3, item]));
     const nameRef = new Map(
       filtered.map((item) => [normalizeCountryName(item.name), item]),
     );
 
-    return { ref, nameRef, min, max, dataCount: filtered.length };
+    return {
+      ref,
+      nameRef,
+      min,
+      max,
+      lowerBound,
+      upperBound,
+      dataCount: filtered.length,
+    };
   }, [data]);
 
   const detailSources = useMemo(
@@ -224,10 +247,19 @@ export function WorldMap({ data, legendLabel, formatOptions, detailMetrics }: Wo
                 (iso3 ? prepared.ref.get(iso3) : undefined) ??
                 prepared.nameRef.get(normalizeCountryName(countryName));
               const value = datum?.value;
-              const fill =
+              const severity =
                 value !== undefined
-                  ? interpolateColor(value, prepared.min, prepared.max)
-                  : "#e2e8f0";
+                  ? (() => {
+                      const range = prepared.upperBound - prepared.lowerBound;
+                      if (range <= 0) return 0.5;
+                      const normalized =
+                        (value - prepared.lowerBound) / range;
+                      return higherIsWorse
+                        ? Math.min(Math.max(normalized, 0), 1)
+                        : Math.min(Math.max(1 - normalized, 0), 1);
+                    })()
+                  : null;
+              const fill = severity !== null ? interpolateColor(severity) : "#e2e8f0";
               const selectedKey = datum?.iso3 ?? iso3 ?? null;
               const isSelected = Boolean(selectedIso3 && selectedKey === selectedIso3);
 
@@ -268,10 +300,10 @@ export function WorldMap({ data, legendLabel, formatOptions, detailMetrics }: Wo
         </Geographies>
       </ComposableMap>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
-        <span className="font-medium text-slate-800">{legendLabel}</span>
+        <span className="font-medium text-slate-800">{legendLabel} (darker = worse)</span>
         <div className="flex items-center gap-2">
           <span className="text-xs">{formatValue(prepared.min)}</span>
-          <div className="h-2 w-24 rounded-full bg-gradient-to-r from-sky-100 to-cyan-600" />
+          <div className="h-2 w-24 rounded-full bg-gradient-to-r from-rose-100 to-red-800" />
           <span className="text-xs">{formatValue(prepared.max)}</span>
         </div>
       </div>
