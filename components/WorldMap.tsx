@@ -26,6 +26,13 @@ type WorldMapProps = {
   }>;
 };
 
+type HoverPreview = {
+  name: string;
+  iso3: string | null;
+  value?: number;
+  hasData: boolean;
+};
+
 const GEO_URL = "/world-110m.json";
 
 const COUNTRY_NAME_ALIASES: Record<string, string> = {
@@ -105,6 +112,7 @@ export function WorldMap({ data, legendLabel, formatOptions, detailMetrics }: Wo
   const suffix = formatOptions?.suffix ?? "";
   const formatValue = (value: number) => `${value.toFixed(decimals)}${suffix}`;
   const [selectedIso3, setSelectedIso3] = useState<string | null>(null);
+  const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
 
   const prepareData = (dataset: MapDatum[]) =>
     dataset.filter((item) => item.iso3 && Number.isFinite(item.value));
@@ -120,7 +128,7 @@ export function WorldMap({ data, legendLabel, formatOptions, detailMetrics }: Wo
       filtered.map((item) => [normalizeCountryName(item.name), item]),
     );
 
-    return { ref, nameRef, min, max };
+    return { ref, nameRef, min, max, dataCount: filtered.length };
   }, [data]);
 
   const detailSources = useMemo(
@@ -173,6 +181,12 @@ export function WorldMap({ data, legendLabel, formatOptions, detailMetrics }: Wo
 
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+        <span>
+          Live data coverage: {prepared.dataCount} countries
+        </span>
+        <span>Hover to preview, click to pin details.</span>
+      </div>
       <ComposableMap projectionConfig={{ scale: 150 }}>
         <Geographies geography={GEO_URL}>
           {({ geographies }) =>
@@ -207,6 +221,15 @@ export function WorldMap({ data, legendLabel, formatOptions, detailMetrics }: Wo
                     hover: { outline: "none", fill: "#2563eb", cursor: "pointer" },
                     pressed: { outline: "none" },
                   }}
+                  onMouseEnter={() => {
+                    setHoverPreview({
+                      name: datum?.name ?? countryName,
+                      iso3: selectedKey,
+                      value,
+                      hasData: value !== undefined,
+                    });
+                  }}
+                  onMouseLeave={() => setHoverPreview(null)}
                   onClick={() => selectedKey && setSelectedIso3(selectedKey)}
                   tabIndex={-1}
                   aria-label={
@@ -228,6 +251,17 @@ export function WorldMap({ data, legendLabel, formatOptions, detailMetrics }: Wo
           <span className="text-xs">{formatValue(prepared.max)}</span>
         </div>
       </div>
+      {hoverPreview ? (
+        <div className="mt-3 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-slate-700">
+          <p className="font-semibold text-slate-900">{hoverPreview.name}</p>
+          <p>
+            {hoverPreview.hasData
+              ? `${legendLabel}: ${formatValue(hoverPreview.value!)}`
+              : "No live data for this country"}
+            {hoverPreview.iso3 ? ` · ISO: ${hoverPreview.iso3}` : ""}
+          </p>
+        </div>
+      ) : null}
       {selection ? (
         <div className="mt-4 rounded-3xl border border-slate-100 bg-slate-50 px-5 py-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">

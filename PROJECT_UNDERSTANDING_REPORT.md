@@ -92,3 +92,38 @@ This repository is connected to GitHub + Vercel. After pushing commit(s), Vercel
 1. Add a small unit test for country matching normalization logic.
 2. Consider switching to a topology source with stable ISO3 properties to reduce fallback complexity.
 3. Add a "matched countries count" debug metric in development mode for faster diagnostics.
+
+## 8) Map interaction enhancement (second 10-version iteration)
+
+### Goal
+Improve map usability after the data-match bug fix by making interaction clearer and faster for users.
+
+### V1
+- Re-reviewed `WorldMap` interaction flow and identified lack of hover feedback.
+
+### V2
+- Added interaction model: hover = quick preview, click = persistent detail pin.
+
+### V3
+- Introduced `HoverPreview` state structure to carry country/data snapshot.
+
+### V4
+- Added `onMouseEnter` preview updates on each geography region.
+
+### V5
+- Added `onMouseLeave` reset behavior to avoid stale tooltip state.
+
+### V6
+- Added compact hover info card showing country name, metric value, and ISO when available.
+
+### V7
+- Added "Live data coverage" indicator to surface how many countries currently have data.
+
+### V8
+- Added concise interaction hint text so users immediately know how to use map gestures.
+
+### V9
+- Validated that hover preview works for both data and no-data countries without errors.
+
+### V10
+- Final polish pass on visual hierarchy and messaging consistency with existing dashboard style.
